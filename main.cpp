@@ -2,7 +2,7 @@
 RRST NHK2025
 足回り直進補正
 ROS2ノードから受信した入力0~100%に応じてMDに出力する
-並列してオドメトリエンコーダーのパルスからX軸、Y軸方向の並進速度[mm/s]を計算しROS2ノードに送信する
+並列してオドメトリエンコーダーのパルスからX軸、Y軸方向の並進速度[m/s]を計算しROS2ノードに送信する
 通信はUDPで行う
 PIDはROS2上で処理する
 2024/10/21
@@ -16,7 +16,7 @@ PIDはROS2上で処理する
 
 #define PI 3.141592653589793
 
-//---------------------------QEI---------------------------//
+//エンコーダー(QEIライブラリ)の設定
 QEI ENC1(PC_0, PG_1, NC, 2048, QEI::X4_ENCODING);
 QEI ENC2(PF_2, PC_3, NC, 2048, QEI::X4_ENCODING);
 QEI ENC3(PD_4, PF_5, NC, 2048, QEI::X4_ENCODING);
@@ -31,12 +31,11 @@ pulsePerRev -> Resolution (PPR)を指す
 X4も可,X4のほうが細かく取れる
 データシート: https://jp.cuidevices.com/product/resource/amt10-v.pdf
 */
-//---------------------------end---------------------------//
 
 using ThisThread::sleep_for;
 void receive(UDPSocket *receiver);
 
-//---------------------------ピンの割り当て---------------------------//
+//ピン割り当て
 PwmOut MD1P(PA_0);
 PwmOut MD2P(PA_3);
 PwmOut MD3P(PB_4);
@@ -64,28 +63,26 @@ DigitalIn SW1(PF_15);
 DigitalIn SW2(PG_14);
 DigitalIn SW3(PG_9);
 DigitalIn SW4(PE_7);
-//---------------------------end---------------------------//
 
-//---------------------------グローバル変数---------------------------//
-int Pulse[7];
-int last_Pulse[7];
+int Pulse[7];      //エンコーダーのパルス格納用
+int last_Pulse[7]; //前回のエンコーダーのパルス格納用（使ってないので削除予定）
 float v[7] = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0}; //速度の格納[m/s]
-float RPM[7] = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+float RPM[7] = {0.0, 0.0, 0.0, 0.0,
+                0.0, 0.0, 0.0}; // RPMの格納（使ってないので削除予定）
 
 float period = 10; // 制御周期[ms]
-float R = 0.05;      //オムニ直径[mm]
+float R = 0.05;    //オムニ直径[mm]
 int PPR = 8192;    //エンコーダーのResolution
-//---------------------------end---------------------------//
 
-double mdd[9];
-double mdp[9];
+double mdd[9]; // MDに出力する方向指令を格納
+double mdp[9]; // MDに出力するduty比を格納
 
 int main() {
 
   // 送信データ
   char sendData[32];
 
-  //---------------------------PWM Settings---------------------------//
+  // PWM周波数の設定
   MD1P.period_us(50);
   MD2P.period_us(50);
   MD3P.period_us(50);
@@ -95,19 +92,16 @@ int main() {
   MD7P.period_us(50);
   MD8P.period_us(50);
   /*
-  50(us) = 1000(ms) / 20000(Hz) * 10^3
-  MDに合わせて調整
-  CytronのMDはPWM周波数が20kHzなので上式になる
-  */
-  //---------------------------end---------------------------//
+　50(us) = 1000(ms) / 20000(Hz) * 10^3
+　MDに合わせて調整
+　CytronのMDはPWM周波数が20kHzなので上式になる
+*/
 
-  //---------------------------UDP Settings---------------------------//
-
-  // 送信先情報(F7)
+  // 送信先のIPアドレスとポート
   const char *destinationIP = "192.168.8.196";
   const uint16_t destinationPort = 4000;
 
-  // 自機情報
+  // 自機のIPアドレスとポート
   const char *myIP = "192.168.8.215";
   const char *myNetMask = "255.255.255.0";
   const uint16_t receivePort = 5000;
@@ -147,8 +141,6 @@ int main() {
   destination.set_ip_address(destinationIP);
   destination.set_port(destinationPort);
 
-  //---------------------------end---------------------------//
-
   // 受信用のスレッドをスタート
   receiveThread.start(callback(receive, &udp));
 
@@ -163,6 +155,7 @@ int main() {
     Pulse[5] = ENC5.getPulses();
     Pulse[6] = ENC6.getPulses();
 
+    //エンコーダーのパルスから速度[m/s]を計算
     for (int i = 1; i <= 6; i++) {
       v[i] = Pulse[i] * (R * PI / PPR) * (1000 / period);
     }
@@ -179,7 +172,6 @@ int main() {
     for (int i = 0; i < 7; i++) {
       char temp[32]; // 一時的なバッファ
 
-      // RPM値を文字列に変換
       sprintf(temp, "%f", v[i]);
 
       if (i == 0) {
@@ -191,7 +183,7 @@ int main() {
     }
 
     // printf("%f\n", v[1]); For debug
-
+    //ROS2ノードに現在の速度を返す
     if (const int result =
             udp.sendto(destination, sendData, sizeof(sendData)) < 0) {
       printf("send Error: %d\n", result);
