@@ -18,22 +18,6 @@ PIDはROS2上で処理する
 // 円周率の定義
 #define PI 3.141592653589793
 
-// エンコーダー(QEIライブラリ)の設定
-QEI ENC1(PC_0, PG_1, NC, 2048, QEI::X4_ENCODING);
-QEI ENC2(PF_2, PC_3, NC, 2048, QEI::X4_ENCODING);
-QEI ENC3(PD_4, PF_5, NC, 2048, QEI::X4_ENCODING);
-QEI ENC4(PA_6, PF_7, NC, 2048, QEI::X4_ENCODING);
-QEI ENC5(PE_8, PF_9, NC, 2048, QEI::X4_ENCODING);
-QEI ENC6(PF_10, PD_11, NC, 2048, QEI::X4_ENCODING);
-
-/*
-QEI (A_ch, B_ch, index, int pulsesPerRev, QEI::X2_ENCODING)
-index -> Xピン, １回転ごとに１パルス出力される？ 使わない場合はNCでok
-pulsePerRev -> Resolution (PPR)を指す
-X4も可,X4のほうが細かく取れる
-データシート: https://jp.cuidevices.com/product/resource/amt10-v.pdf
-*/
-
 using ThisThread::sleep_for;
 void receive(UDPSocket *receiver);
 
@@ -74,7 +58,8 @@ DigitalIn SW4(PE_7);
 int Pulse[7];      // エンコーダーのパルス格納用
 int last_Pulse[7]; // 前回のエンコーダーのパルス格納用（使ってないので削除予定）
 float v[7] = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0}; // 速度の格納[m/s]
-float RPM[7] = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0}; // RPMの格納（使ってないので削除予定）
+float RPM[7] = {0.0, 0.0, 0.0, 0.0,
+                0.0, 0.0, 0.0}; // RPMの格納（使ってないので削除予定）
 
 float period = 10; // 制御周期[ms]
 float R = 0.05;    // オムニ直径[mm]
@@ -82,6 +67,22 @@ int PPR = 8192;    // エンコーダーのResolution
 
 double mdd[9]; // MDに出力する方向指令を格納
 double mdp[9]; // MDに出力するduty比を格納
+
+// エンコーダー(QEIライブラリ)の設定
+QEI ENC1(PC_0, PG_1, NC, 2048, QEI::X4_ENCODING);
+QEI ENC2(PF_2, PC_3, NC, 2048, QEI::X4_ENCODING);
+QEI ENC3(PD_4, PF_5, NC, 2048, QEI::X4_ENCODING);
+QEI ENC4(PA_6, PF_7, NC, 2048, QEI::X4_ENCODING);
+QEI ENC5(PE_8, PF_9, NC, 2048, QEI::X4_ENCODING);
+QEI ENC6(PF_10, PD_11, NC, 2048, QEI::X4_ENCODING);
+
+/*
+QEI (A_ch, B_ch, index, int pulsesPerRev, QEI::X2_ENCODING)
+index -> Xピン, １回転ごとに１パルス出力される？ 使わない場合はNCでok
+pulsePerRev -> Resolution (PPR)を指す
+X4も可,X4のほうが細かく取れる
+データシート: https://jp.cuidevices.com/product/resource/amt10-v.pdf
+*/
 
 int main() {
   // 送信データ
@@ -177,7 +178,7 @@ int main() {
 
     // 速度データを文字列に変換
     for (int i = 0; i < 7; i++) {
-      char temp[32]; // 一時的なバッファ
+      char temp[32];             // 一時的なバッファ
       sprintf(temp, "%f", v[i]); // floatを文字列に変換
 
       // sendDataにtempをペーストする
@@ -190,7 +191,8 @@ int main() {
     }
 
     // ROS2ノードに現在の速度を送信
-    if (const int result = udp.sendto(destination, sendData, sizeof(sendData)) < 0) {
+    if (const int result =
+            udp.sendto(destination, sendData, sizeof(sendData)) < 0) {
       printf("send Error: %d\n", result); // エラーの処理
     }
     ThisThread::sleep_for(period); // 一定時間待機（制御周期）
@@ -216,7 +218,8 @@ void receive(UDPSocket *receiver) {
 
   while (1) {
     memset(buffer, 0, sizeof(buffer));
-    if (const int result = receiver->recvfrom(&source, buffer, sizeof(buffer)) < 0) {
+    if (const int result =
+            receiver->recvfrom(&source, buffer, sizeof(buffer)) < 0) {
       printf("Receive Error : %d", result); // エラーの処理
     } else {
       char *ptr;
