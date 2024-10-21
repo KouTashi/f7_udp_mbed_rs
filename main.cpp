@@ -178,7 +178,7 @@ int main() {
     ENC6.reset();
 
     // 速度データを文字列に変換
-    for (int i = 0; i < 7; i++) {
+    for (int i = 0; i <= 7; i++) {
       char temp[32];             // 一時的なバッファ
       sprintf(temp, "%f", v[i]); // floatを文字列に変換
 
