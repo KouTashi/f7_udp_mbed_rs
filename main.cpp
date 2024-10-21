@@ -63,7 +63,7 @@ float RPM[7] = {0.0, 0.0, 0.0, 0.0,
 
 float period = 10; // 制御周期[ms]
 float R = 0.05;    // オムニ直径[mm]
-int PPR = 8192;    // エンコーダーのResolution
+int PPRx4 = 8192;  // エンコーダーのResolution
 
 double mdd[9]; // MDに出力する方向指令を格納
 double mdp[9]; // MDに出力するduty比を格納
@@ -81,6 +81,7 @@ QEI (A_ch, B_ch, index, int pulsesPerRev, QEI::X2_ENCODING)
 index -> Xピン, １回転ごとに１パルス出力される？ 使わない場合はNCでok
 pulsePerRev -> Resolution (PPR)を指す
 X4も可,X4のほうが細かく取れる
+エンコーダー: AMT102-V
 データシート: https://jp.cuidevices.com/product/resource/amt10-v.pdf
 */
 
@@ -165,7 +166,7 @@ int main() {
 
     // エンコーダーのパルスから速度[m/s]を計算
     for (int i = 1; i <= 6; i++) {
-      v[i] = Pulse[i] * (R * PI / PPR) * (1000 / period);
+      v[i] = Pulse[i] * (R * PI / PPRx4) * (1000 / period);
     }
 
     // エンコーダーをリセット
